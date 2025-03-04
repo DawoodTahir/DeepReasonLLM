@@ -4,11 +4,17 @@ from flask_migrate import Migrate
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import openai
+from flask_cors import CORS
 import datetime
 import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+# ✅ Allow CORS for Local & Deployed Frontend
+CORS(app, resources={r"/*": {"origins": [
+    "http://localhost:5173", 
+    "https://sentiment-analysis-ui.netlify.app"
+]}})
 
 # Configure SQLite Database
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///chat_memory.db"
