@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { width: 400px; margin: auto; text-align: center; }
+        input, button { padding: 10px; margin: 5px; width: 90%; }
+        .chat-box { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; text-align: left; }
+        .user-msg { color: blue; }
+        .bot-msg { color: green; }
+        #sessionList { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Chatbot</h2>
+        <div id="loginForm">
+            <h3>Login</h3>
+            <input type="email" id="loginEmail" placeholder="Email"><br>
+            <input type="password" id="loginPassword" placeholder="Password"><br>
+            <button onclick="login()">Login</button>
+            <button onclick="showRegister()">Register</button>
+        </div>
+        <div id="registerForm" style="display:none;">
+            <h3>Register</h3>
+            <input type="email" id="registerEmail" placeholder="Email"><br>
+            <input type="password" id="registerPassword" placeholder="Password"><br>
+            <select id="registerRole">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+            </select><br>
+            <button onclick="register()">Register</button>
+            <button onclick="showLogin()">Back to Login</button>
+        </div>
+        <div id="chatInterface" style="display:none;">
+            <h3>Chatbot</h3>
+            <p id="roleDisplay"></p>
+            <button onclick="logout()">Logout</button>
+            <h4>Sessions</h4>
+            <select id="sessionList" onchange="loadMessages()">
+                <option value="">Select a Session</option>
+            </select>
+            <input type="text" id="sessionName" placeholder="New Session Name">
+            <button onclick="createSession()">Create Session</button>
+            <div class="chat-box" id="chatBox"></div>
+            <input type="text" id="messageInput" placeholder="Type a message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+    <script>
+        let currentSessionId = null;
+        let userRole = null;
+
+        function showRegister() {
+            $("#loginForm").hide();
+            $("#registerForm").show();
+        }
+
+        function showLogin() {
+            $("#registerForm").hide();
+            $("#loginForm").show();
+        }
+
+        function login() {
+            let email = $("#loginEmail").val();
+            let password = $("#loginPassword").val();
+            fetch("/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.message) {
+                    userRole = data.role;
+                    $("#roleDisplay").text(`Logged in as: ${userRole}`);
+                    $("#loginForm").hide();
+                    $("#chatInterface").show();
+                    fetchSessions();
+                } else {
+                    alert("Invalid credentials!");
+                }
+            });
+        }
+
+        function register() {
+            let email = $("#registerEmail").val();
+            let password = $("#registerPassword").val();
+            let role = $("#registerRole").val();
+            fetch("/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, role })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.message) {
+                    alert("Registration successful!");
+                    showLogin();
+                } else {
+                    alert(data.error);
+                }
+            });
+        }
+
+        function logout() {
+            fetch("/logout", { method: "POST" })
+            .then(() => {
+                alert("Logged out!");
+                $("#chatInterface").hide();
+                $("#loginForm").show();
+            });
+        }
+
+        function fetchSessions() {
+            fetch("/sessions")
+            .then(res => res.json())
+            .then(data => {
+                let sessionList = $("#sessionList");
+                sessionList.empty().append('<option value="">Select a Session</option>');
+                data.forEach(session => {
+                    sessionList.append(`<option value="${session.id}">${session.name}</option>`);
+                });
+            });
+        }
+
+        function createSession() {
+            let name = $("#sessionName").val();
+            if (!name) return alert("Enter a session name");
+            fetch("/new_session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert("Session created!");
+                fetchSessions();
+            });
+        }
+
+        function loadMessages() {
+            currentSessionId = $("#sessionList").val();
+            if (!currentSessionId) return;
+            fetch(`/get_messages/${currentSessionId}`)
+            .then(res => res.json())
+            .then(data => {
+                let chatBox = $("#chatBox");
+                chatBox.empty();
+                data.forEach(msg => {
+                    chatBox.append(`<p><strong class="user-msg">You:</strong> ${msg.message}</p>`);
+                    chatBox.append(`<p><strong class="bot-msg">Bot:</strong> ${msg.response}</p>`);
+                });
+            });
+        }
+
+        function sendMessage() {
+            let message = $("#messageInput").val();
+            if (!message || !currentSessionId) return alert("Select a session and type a message");
+            fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: currentSessionId, message })
+            })
+            .then(res => res.json())
+            .then(data => {
+                let chatBox = $("#chatBox");
+                chatBox.append(`<p><strong class="user-msg">You:</strong> ${message}</p>`);
+                chatBox.append(`<p><strong class="bot-msg">Bot:</strong> ${data.response}</p>`);
+                $("#messageInput").val("");
+            });
+        }
+    </script>
+</body>
+</html>
